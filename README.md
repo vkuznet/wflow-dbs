@@ -1,5 +1,8 @@
 # wflow-dbs
-CMS workflow DBS checker
+[![Go CI build](https://github.com/vkuznet/wflow-dbs/actions/workflows/go-ci.yml/badge.svg)](https://github.com/vkuznet/wflow-dbs/actions/workflows/go-ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/vkuznet/wflow-dbs)](https://goreportcard.com/report/github.com/vkuznet/wflow-dbs)
+CMS workflow DBS checker checks given workflow stats against DBS server and
+return input/output dataset along with corresponding lumi info.
 ```
 # build
 make
