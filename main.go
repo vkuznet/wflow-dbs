@@ -41,12 +41,12 @@ func main() {
 
 // Record represents output record from checker
 type Record struct {
-	Workflow           string
-	TotalInputLumis    int
-	InputDataset       string
-	OutputDataset      string
-	InputDatasetLumis  int
-	OutputDatasetLumis int
+	Workflow        string
+	TotalInputLumis int
+	InputDataset    string
+	OutputDataset   string
+	InputStats      DBSRecord
+	OutputStats     DBSRecord
 }
 
 func check(workflow string, verbose bool) {
@@ -73,12 +73,12 @@ func check(workflow string, verbose bool) {
 			os.Exit(1)
 		}
 		rec := Record{
-			Workflow:           workflow,
-			TotalInputLumis:    rec.TotalInputLumis,
-			InputDataset:       input,
-			OutputDataset:      output,
-			InputDatasetLumis:  dbsInputRec.NumLumis,
-			OutputDatasetLumis: dbsOutputRec.NumLumis,
+			Workflow:        workflow,
+			TotalInputLumis: rec.TotalInputLumis,
+			InputDataset:    input,
+			OutputDataset:   output,
+			InputStats:      *dbsInputRec,
+			OutputStats:     *dbsOutputRec,
 		}
 		out = append(out, rec)
 	}
@@ -89,13 +89,16 @@ func check(workflow string, verbose bool) {
 	}
 }
 
-// DbsRecord represents filesummaries record we need to parse
-type DbsRecord struct {
-	NumLumis int `json:"num_lumi"`
+// DBSRecord represents filesummaries record we need to parse
+type DBSRecord struct {
+	NumLumis  int64 `json:"num_lumi"`
+	NumFiles  int64 `json:"num_file"`
+	NumEvents int64 `json:"num_event"`
+	NumBlocks int64 `json:"num_block"`
 }
 
 // helper function to perform dbs call
-func dbsCall(rurl string, verbose bool) (*DbsRecord, error) {
+func dbsCall(rurl string, verbose bool) (*DBSRecord, error) {
 	req, err := http.NewRequest("GET", rurl, nil)
 	if verbose {
 		log.Println("dbs call", rurl)
@@ -111,7 +114,7 @@ func dbsCall(rurl string, verbose bool) (*DbsRecord, error) {
 	}
 	defer resp.Body.Close()
 	data, err := io.ReadAll(resp.Body)
-	var records []DbsRecord
+	var records []DBSRecord
 	if err != nil {
 		if verbose {
 			log.Println("dbsCall io.ReadAll", err)
@@ -171,7 +174,7 @@ func callReqMgr(workflow string, verbose bool) (*ReqMgrRecord, error) {
 		return nil, err
 	}
 	if verbose {
-		log.Println("ReqMgr2 data", string(data))
+		log.Println("ReqMgr2 data\n", string(data))
 	}
 	err = json.Unmarshal(data, &rec)
 	if err != nil {
