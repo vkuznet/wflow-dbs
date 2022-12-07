@@ -29,9 +29,6 @@ func tlsCerts(verbose bool) ([]tls.Certificate, error) {
 		return nil, nil
 	}
 	if uproxy != "" {
-		if verbose {
-			log.Println("read", uproxy)
-		}
 		// use local implementation of LoadX409KeyPair instead of tls one
 		x509cert, err := x509proxy.LoadX509Proxy(uproxy)
 		if err != nil {
@@ -39,9 +36,6 @@ func tlsCerts(verbose bool) ([]tls.Certificate, error) {
 		}
 		certs := []tls.Certificate{x509cert}
 		return certs, nil
-	}
-	if verbose {
-		log.Println("read", uckey, ucert)
 	}
 	x509cert, err := tls.LoadX509KeyPair(ucert, uckey)
 	if err != nil {
@@ -56,9 +50,6 @@ func HttpClient(verbose bool) *http.Client {
 	certs, err := tlsCerts(verbose)
 	if err != nil {
 		log.Fatal(err)
-	}
-	if verbose {
-		log.Println("certs", len(certs))
 	}
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{Certificates: certs},
