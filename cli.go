@@ -32,24 +32,24 @@ func compareStats(istats, ostats *DBSRecord) string {
 		test = false
 		out = append(out, fmt.Sprintf("number of lumis differ %d != %d", istats.NumLumis, ostats.NumLumis))
 	}
-	if istats.NumFiles == ostats.NumFiles {
-		test = true
-	} else {
-		test = false
-		out = append(out, fmt.Sprintf("number of files differ %d != %d", istats.NumFiles, ostats.NumFiles))
-	}
+	//     if istats.NumFiles == ostats.NumFiles {
+	//         test = true
+	//     } else {
+	//         test = false
+	//         out = append(out, fmt.Sprintf("number of files differ %d != %d", istats.NumFiles, ostats.NumFiles))
+	//     }
 	if istats.NumEvents == ostats.NumEvents {
 		test = true
 	} else {
 		test = false
 		out = append(out, fmt.Sprintf("number of files differ %d != %d", istats.NumEvents, ostats.NumEvents))
 	}
-	if istats.NumBlocks == ostats.NumBlocks {
-		test = true
-	} else {
-		test = false
-		out = append(out, fmt.Sprintf("number of files differ %d != %d", istats.NumBlocks, ostats.NumBlocks))
-	}
+	//     if istats.NumBlocks == ostats.NumBlocks {
+	//         test = true
+	//     } else {
+	//         test = false
+	//         out = append(out, fmt.Sprintf("number of files differ %d != %d", istats.NumBlocks, ostats.NumBlocks))
+	//     }
 	if test {
 		return "OK"
 	}
@@ -108,15 +108,13 @@ func check(workflow string, verbose bool) ([]Record, error) {
 	if input == "" {
 		input = rec.Task1.InputDataset
 	}
-	durl := fmt.Sprintf("https://cmsweb.cern.ch/dbs/prod/global/DBSReader/filesummaries?dataset=%s", input)
-	dbsInputRec, err := dbsCall(durl, verbose)
+	dbsInputRec, err := dbsCall(input, verbose)
 	if err != nil {
 		fmt.Printf("ERROR: unable to get DBS data for %s, %v", input, err)
 		return out, err
 	}
 	for _, output := range rec.OutputDatasets {
-		durl = fmt.Sprintf("https://cmsweb.cern.ch/dbs/prod/global/DBSReader/filesummaries?dataset=%s", output)
-		dbsOutputRec, err := dbsCall(durl, verbose)
+		dbsOutputRec, err := dbsCall(output, verbose)
 		if err != nil {
 			fmt.Printf("ERROR: unable to get DBS data for %s, %v", output, err)
 			return out, err
@@ -137,14 +135,16 @@ func check(workflow string, verbose bool) ([]Record, error) {
 
 // DBSRecord represents filesummaries record we need to parse
 type DBSRecord struct {
-	NumLumis  int64 `json:"num_lumi"`
-	NumFiles  int64 `json:"num_file"`
-	NumEvents int64 `json:"num_event"`
-	NumBlocks int64 `json:"num_block"`
+	NumLumis        int64 `json:"num_lumi"`
+	NumFiles        int64 `json:"num_file"`
+	NumEvents       int64 `json:"num_event"`
+	NumBlocks       int64 `json:"num_block"`
+	NumInvalidFiles int64 `json:"num_invalid_files"`
 }
 
 // helper function to perform dbs call
-func dbsCall(rurl string, verbose bool) (*DBSRecord, error) {
+func dbsCall(input string, verbose bool) (*DBSRecord, error) {
+	rurl := fmt.Sprintf("https://cmsweb.cern.ch/dbs/prod/global/DBSReader/filesummaries?dataset=%s", input)
 	req, err := http.NewRequest("GET", rurl, nil)
 	if verbose {
 		log.Println("dbs call", rurl)
@@ -175,6 +175,40 @@ func dbsCall(rurl string, verbose bool) (*DBSRecord, error) {
 		return nil, err
 	}
 	rec := records[0]
+
+	// make another call to files DBS API to get number of valid files
+	rurl = fmt.Sprintf("https://cmsweb.cern.ch/dbs/prod/global/DBSReader/files?dataset=%s&validFileOnly=1", input)
+	req, err = http.NewRequest("GET", rurl, nil)
+	if verbose {
+		log.Println("dbs call", rurl)
+	}
+	req.Header.Add("Accept", "application/json")
+	resp, err = client.Do(req)
+	if err != nil {
+		if verbose {
+			log.Println("dbsCall client.Do", err)
+		}
+		return nil, err
+	}
+	defer resp.Body.Close()
+	data, err = io.ReadAll(resp.Body)
+	var results []any
+	if err != nil {
+		if verbose {
+			log.Println("dbsCall io.ReadAll", err)
+		}
+		return nil, err
+	}
+	err = json.Unmarshal(data, &results)
+	if err != nil {
+		if verbose {
+			log.Println("dbsCall json.Unmarshal", err)
+		}
+		return nil, err
+	}
+	//     log.Println("### nfiles", len(results))
+	//     rec.NumInvalidFiles = int64(len(results)) - rec.NumFiles
+	rec.NumInvalidFiles = rec.NumFiles - int64(len(results))
 	return &rec, nil
 }
 
