@@ -103,14 +103,20 @@ func DataHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		for _, wflow := range workflows {
-			results, err := check(wflow, false)
-			if err == nil {
-				for _, r := range results {
-					out = append(out, r)
-				}
-			}
+		out, err = concurrentCheck(workflows)
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
+		//         for _, wflow := range workflows {
+		//             results, err := check(wflow, false)
+		//             if err == nil {
+		//                 for _, r := range results {
+		//                     out = append(out, r)
+		//                 }
+		//             }
+		//         }
 	}
 	// construct output JSON
 	data, err := json.MarshalIndent(out, "", "   ")

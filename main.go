@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -36,7 +37,14 @@ func main() {
 
 	}
 	if webConfig == "" {
-		out, err := check(workflow, verbose)
+		wflows := strings.Split(workflow, ",")
+		var out []Record
+		var err error
+		if len(wflows) == 1 {
+			out, err = check(workflow, verbose)
+		} else {
+			out, err = concurrentCheck(wflows)
+		}
 		if err != nil {
 			log.Fatal(err)
 		}

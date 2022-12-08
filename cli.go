@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // Record represents output record from checker
@@ -53,6 +54,44 @@ func compareStats(istats, ostats *DBSRecord) string {
 		return "OK"
 	}
 	return "WARNING: " + strings.Join(out, ", ")
+}
+
+// helper function to concurrently check DBS infor for given list of workflows
+func concurrentCheck(wflows []string) ([]Record, error) {
+	ch := make(chan []Record)
+	defer close(ch)
+	umap := map[string]bool{}
+	for _, w := range wflows {
+		umap[w] = true // keep track of processed workflows below
+		go func(wflow string, c chan<- []Record) {
+			records, err := check(wflow, false)
+			if err != nil {
+				umap[wflow] = false
+				log.Println("fail to process %s, error %v", wflow, err)
+			}
+			c <- records
+		}(w, ch)
+	}
+	exit := false
+	var out []Record
+	for {
+		select {
+		case records := <-ch:
+			for _, r := range records {
+				out = append(out, r)
+				delete(umap, r.Workflow) // remove Url from map
+			}
+		default:
+			if len(umap) == 0 { // no more requests, merge data records
+				exit = true
+			}
+			time.Sleep(time.Duration(10) * time.Millisecond) // wait for response
+		}
+		if exit {
+			break
+		}
+	}
+	return out, nil
 }
 
 // helper function to check workflow against DBS
