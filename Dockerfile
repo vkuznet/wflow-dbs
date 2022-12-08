@@ -13,8 +13,8 @@ WORKDIR $WDIR/wflow-dbs
 RUN git checkout tags/$TAG -b build && make
 
 # https://blog.baeke.info/2021/03/28/distroless-or-scratch-for-go-apps/
-# FROM alpine:3.16
-FROM gcr.io/distroless/static AS final
+FROM alpine:3.16
+# FROM gcr.io/distroless/static AS final
 RUN mkdir -p /data
 COPY --from=go-builder /data/wflow-dbs/wflow-dbs /data/
 COPY --from=go-builder /data/wflow-dbs/static /data/
