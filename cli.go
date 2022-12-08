@@ -67,7 +67,7 @@ func concurrentCheck(wflows []string) ([]Record, error) {
 			records, err := check(wflow, false)
 			if err != nil {
 				umap[wflow] = false
-				log.Println("fail to process %s, error %v", wflow, err)
+				log.Printf("fail to process %s, error %v", wflow, err)
 			}
 			c <- records
 		}(w, ch)
@@ -241,6 +241,9 @@ func callReqMgr(workflow string, verbose bool) (*ReqMgrRecord, error) {
 		log.Println("rurl", rurl)
 	}
 	req, err := http.NewRequest("GET", rurl, nil)
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Add("Accept", "application/json")
 	client := HttpClient(verbose)
 	resp, err := client.Do(req)
