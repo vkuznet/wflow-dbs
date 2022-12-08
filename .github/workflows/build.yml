@@ -61,3 +61,36 @@ jobs:
         asset_path: ./tools.tar.gz
         asset_name: tools.tar.gz
         asset_content_type: application/octet-stream
+
+    - name: Get the Ref
+      id: get-ref
+      uses: ankitvgupta/ref-to-tag-action@master
+      with:
+        ref: ${{ github.ref }}
+        head_ref: ${{ github.head_ref }}
+
+    - name: Build image
+      run: |
+        sed -i -e "s,ENV TAG=.*,ENV TAG=${{steps.get-ref.outputs.tag}},g" Dockerfile
+        docker build . --tag docker.pkg.github.com/dmwm/wflow-dbs/wflow-dbs
+        docker tag docker.pkg.github.com/dmwm/wflow-dbs/wflow-dbs registry.cern.ch/cmsweb/wflow-dbs
+
+    - name: List images
+      run: |
+        docker images
+
+#     - name: Login to registry.cern.ch
+#       uses: docker/login-action@v1.6.0
+#       with:
+#         registry: registry.cern.ch
+#         username: ${{ secrets.CERN_LOGIN }}
+#         password: ${{ secrets.CERN_TOKEN }}
+
+#     - name: Publish image to registry.cern.ch
+#       uses: docker/build-push-action@v1
+#       with:
+#         username: ${{ secrets.CERN_LOGIN }}
+#         password: ${{ secrets.CERN_TOKEN }}
+#         registry: registry.cern.ch
+#         repository: cmsweb/wflow-dbs
+#         tag_with_ref: true
