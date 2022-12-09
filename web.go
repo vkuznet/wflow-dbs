@@ -66,6 +66,7 @@ func Handlers() *mux.Router {
 
 	// end-points
 	router.HandleFunc(basePath("/stats"), DataHandler).Methods("POST", "GET")
+	router.HandleFunc(basePath("/healthz"), HealthzHandler).Methods("GET")
 
 	// static handlers
 	for _, dir := range []string{"js", "css", "images"} {
@@ -115,6 +116,11 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	page := templates.Tmpl(Config.Templates, "main.tmpl", tmplData)
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(_top + page + _bottom))
+}
+
+// HealthzHandler process /healthz requests
+func HealthzHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
 }
 
 // DataHandler process incoming requests
