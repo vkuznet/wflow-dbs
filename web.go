@@ -37,6 +37,9 @@ func parseConfig(configFile string) error {
 		return err
 	}
 	err = json.Unmarshal(data, &Config)
+	if err != nil {
+		return err
+	}
 	if Config.Templates == "" {
 		Config.Templates = fmt.Sprintf("%s/templates", Config.StaticDir)
 	}
