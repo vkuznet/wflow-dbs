@@ -52,7 +52,7 @@ func HttpClient(verbose bool) *http.Client {
 		log.Fatal(err)
 	}
 	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{Certificates: certs},
+		TLSClientConfig: &tls.Config{Certificates: certs, InsecureSkipVerify: true},
 	}
 	return &http.Client{Transport: tr}
 }
