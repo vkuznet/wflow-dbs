@@ -25,11 +25,10 @@ type Record struct {
 // helper function to compare input/output dbs record stats
 func compareStats(istats, ostats *DBSRecord) string {
 	var out []string
-	var test bool
+	test := false
 	if istats.NumLumis == ostats.NumLumis {
 		test = true
 	} else {
-		test = false
 		out = append(out, fmt.Sprintf("number of lumis differ %d != %d", istats.NumLumis, ostats.NumLumis))
 	}
 	//     if istats.NumFiles == ostats.NumFiles {
@@ -145,9 +144,12 @@ type DBSRecord struct {
 // helper function to perform dbs call
 func dbsCall(input string, verbose bool) (*DBSRecord, error) {
 	rurl := fmt.Sprintf("https://cmsweb.cern.ch/dbs/prod/global/DBSReader/filesummaries?dataset=%s", input)
-	req, err := http.NewRequest("GET", rurl, nil)
 	if verbose {
 		log.Println("dbs call", rurl)
+	}
+	req, err := http.NewRequest("GET", rurl, nil)
+	if err != nil {
+		return nil, err
 	}
 	req.Header.Add("Accept", "application/json")
 	client := HttpClient(verbose)
@@ -178,9 +180,12 @@ func dbsCall(input string, verbose bool) (*DBSRecord, error) {
 
 	// make another call to files DBS API to get number of valid files
 	rurl = fmt.Sprintf("https://cmsweb.cern.ch/dbs/prod/global/DBSReader/files?dataset=%s&validFileOnly=1", input)
-	req, err = http.NewRequest("GET", rurl, nil)
 	if verbose {
 		log.Println("dbs call", rurl)
+	}
+	req, err = http.NewRequest("GET", rurl, nil)
+	if err != nil {
+		return nil, err
 	}
 	req.Header.Add("Accept", "application/json")
 	resp, err = client.Do(req)
@@ -220,7 +225,7 @@ type ResultRecord struct {
 	Result []WorkflowRecord
 }
 
-// Task represents task stucture of ReqMgr2
+// Task represents task structure of ReqMgr2
 type Task struct {
 	InputDataset string
 }
