@@ -2,7 +2,7 @@ FROM golang:latest as go-builder
 MAINTAINER Valentin Kuznetsov vkuznet@gmail.com
 
 # tag to use
-ENV TAG=0.0.01
+ENV TAG=0.0.02
 
 # build procedure
 ENV WDIR=/data
@@ -17,5 +17,5 @@ FROM alpine:3.16
 # FROM gcr.io/distroless/static AS final
 RUN mkdir -p /data
 COPY --from=go-builder /data/wflow-dbs/wflow-dbs /data/
-COPY --from=go-builder /data/wflow-dbs/static /data/
+COPY --from=go-builder /data/wflow-dbs/static /data/static
 CMD ["/data/wflow-dbs"]
