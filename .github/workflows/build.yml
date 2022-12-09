@@ -79,18 +79,18 @@ jobs:
       run: |
         docker images
 
-#     - name: Login to registry.cern.ch
-#       uses: docker/login-action@v1.6.0
-#       with:
-#         registry: registry.cern.ch
-#         username: ${{ secrets.CERN_LOGIN }}
-#         password: ${{ secrets.CERN_TOKEN }}
+    - name: Login to registry.cern.ch
+      uses: docker/login-action@v1.6.0
+      with:
+        registry: registry.cern.ch
+        username: ${{ secrets.CERN_LOGIN }}
+        password: ${{ secrets.CERN_TOKEN }}
 
-#     - name: Publish image to registry.cern.ch
-#       uses: docker/build-push-action@v1
-#       with:
-#         username: ${{ secrets.CERN_LOGIN }}
-#         password: ${{ secrets.CERN_TOKEN }}
-#         registry: registry.cern.ch
-#         repository: cmsweb/wflow-dbs
-#         tag_with_ref: true
+    - name: Publish image to registry.cern.ch
+      uses: docker/build-push-action@v1
+      with:
+        username: ${{ secrets.CERN_LOGIN }}
+        password: ${{ secrets.CERN_TOKEN }}
+        registry: registry.cern.ch
+        repository: cmsweb/wflow-dbs
+        tag_with_ref: true
