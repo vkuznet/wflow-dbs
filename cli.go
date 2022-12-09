@@ -25,34 +25,20 @@ type Record struct {
 // helper function to compare input/output dbs record stats
 func compareStats(istats, ostats *DBSRecord) string {
 	var out []string
-	test := false
-	if istats.NumLumis == ostats.NumLumis {
-		test = true
-	} else {
+	if istats.NumLumis != ostats.NumLumis {
 		out = append(out, fmt.Sprintf("number of lumis differ %d != %d", istats.NumLumis, ostats.NumLumis))
 	}
-	//     if istats.NumFiles == ostats.NumFiles {
-	//         test = true
-	//     } else {
-	//         test = false
-	//         out = append(out, fmt.Sprintf("number of files differ %d != %d", istats.NumFiles, ostats.NumFiles))
-	//     }
-	if istats.NumEvents == ostats.NumEvents {
-		test = true
-	} else {
-		test = false
-		out = append(out, fmt.Sprintf("number of files differ %d != %d", istats.NumEvents, ostats.NumEvents))
+	if istats.NumEvents != ostats.NumEvents {
+		out = append(out, fmt.Sprintf("number of events differ %d != %d", istats.NumEvents, ostats.NumEvents))
 	}
-	//     if istats.NumBlocks == ostats.NumBlocks {
-	//         test = true
-	//     } else {
-	//         test = false
-	//         out = append(out, fmt.Sprintf("number of files differ %d != %d", istats.NumBlocks, ostats.NumBlocks))
-	//     }
-	if test {
-		return "OK"
+	msg := "OK"
+	if len(out) != 0 {
+		msg = "WARNING: " + strings.Join(out, ", ")
 	}
-	return "WARNING: " + strings.Join(out, ", ")
+	if istats.NumInvalidFiles != ostats.NumInvalidFiles {
+		msg = fmt.Sprintf("%s, but some files were invalidated", msg)
+	}
+	return msg
 }
 
 // helper function to concurrently check DBS infor for given list of workflows
