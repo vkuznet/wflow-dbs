@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -171,7 +172,9 @@ func dbsBlocks(dataset string, verbose bool) ([]string, error) {
 	if verbose {
 		log.Println("dbs call", rurl)
 	}
-	req, err := http.NewRequest("GET", rurl, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*60))
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", rurl, nil)
 	if err != nil {
 		return blocks, err
 	}
@@ -215,15 +218,26 @@ func blockID(blk string) string {
 	return arr[1]
 }
 
+// GoMap represents map to keep track of go routines
 type GoMap map[string]bool
 
 // helper function to yield RunLumi records for given URL with block name
 func runLumis(rurl, bid string, verbose bool, ch chan<- RunLumi, umap *GoMap) {
 	var lock = sync.Mutex{}
+	defer func() {
+		lock.Lock()
+		delete(*umap, bid) // we done with this stream of data
+		if verbose {
+			log.Println("delete", bid, "from url map")
+		}
+		lock.Unlock()
+	}()
 	if verbose {
 		log.Println("dbs call", rurl)
 	}
-	req, err := http.NewRequest("GET", rurl, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*180))
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", rurl, nil)
 	if err != nil {
 		log.Println("ERROR: runLumis new request", err)
 		return
@@ -248,12 +262,6 @@ func runLumis(rurl, bid string, verbose bool, ch chan<- RunLumi, umap *GoMap) {
 		var rec RunLumi
 		err := dec.Decode(&rec)
 		if err == io.EOF {
-			lock.Lock()
-			delete(*umap, bid) // we done with this stream of data
-			if verbose {
-				log.Println("delete", bid, "from url map")
-			}
-			lock.Unlock()
 			return
 		}
 		ch <- rec
@@ -321,7 +329,9 @@ func dbsCall(input string, validFileOnly int, verbose bool) (*DBSRecord, error) 
 	if verbose {
 		log.Println("dbs call", rurl)
 	}
-	req, err := http.NewRequest("GET", rurl, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*60))
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", rurl, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -385,7 +395,9 @@ func callReqMgr(workflow string, verbose bool) (*ReqMgrRecord, error) {
 	if verbose {
 		log.Println("rurl", rurl)
 	}
-	req, err := http.NewRequest("GET", rurl, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*60))
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", rurl, nil)
 	if err != nil {
 		return nil, err
 	}
