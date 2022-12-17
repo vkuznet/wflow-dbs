@@ -36,7 +36,11 @@ func main() {
 		os.Exit(0)
 
 	}
+	if verbose {
+		log.SetFlags(log.LstdFlags | log.Lshortfile)
+	}
 	if webConfig == "" {
+		time0 := time.Now()
 		wflows := strings.Split(workflow, ",")
 		var out []Record
 		var err error
@@ -47,6 +51,9 @@ func main() {
 		}
 		if err != nil {
 			log.Fatal(err)
+		}
+		if verbose {
+			fmt.Printf("Total number of URL calls %d, elapsed time %v\n", TotalURLCalls, time.Since(time0))
 		}
 		// construct output JSON
 		data, err := json.MarshalIndent(out, "", "   ")
