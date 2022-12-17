@@ -12,6 +12,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/alitto/pond"
 )
 
 const dbsUrl string = "https://cmsweb.cern.ch/dbs/prod/global/DBSReader"
@@ -159,6 +161,9 @@ func runLumis(rurl, bid string, verbose bool, ch chan<- RunLumi, umap *GoMap) {
 
 // helper function to get unique number of lumis for given list of blocks
 func dbsBlocksLumis(blocks []string, verbose bool) (int64, int64, error) {
+	// use pool which can scale up to 50 workers has buffer capacity of N blocks
+	pool := pond.New(50, len(blocks))
+
 	var lock = sync.RWMutex{}
 	ch := make(chan RunLumi)
 	defer close(ch)
@@ -169,8 +174,20 @@ func dbsBlocksLumis(blocks []string, verbose bool) (int64, int64, error) {
 		umap[bid] = true // keep track of processed block ids
 		lock.Unlock()
 		rurl := fmt.Sprintf("%s/filelumis?block_name=%s", dbsUrl, url.QueryEscape(b))
-		go runLumis(rurl, bid, verbose, ch, &umap)
+
+		// usage of goroutine can lead to uncontrolled calls to DBS which will
+		// block this client at 100 req/sec
+		// go runLumis(rurl, bid, verbose, ch, &umap)
+
+		// usage of pool provides controlled (fixed size) environment to call DBS
+		// where at most we will place number of calls limited by max pool size
+		pool.Submit(func() {
+			runLumis(rurl, bid, verbose, ch, &umap)
+		})
 	}
+	// Stop the pool and wait for all submitted tasks to complete
+	defer pool.StopAndWait()
+
 	if verbose {
 		log.Printf("Make %d calls to DBS to fetch block lumis\n", len(umap))
 	}
