@@ -11,6 +11,9 @@ import (
 	"time"
 )
 
+// TotalURLCalls counts total number of URL calls we made
+var TotalURLCalls uint64
+
 // version of the code
 var gitVersion string
 
