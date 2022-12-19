@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/alitto/pond"
 )
 
 // TotalURLCalls counts total number of URL calls we made
@@ -16,6 +18,9 @@ var TotalURLCalls uint64
 
 // version of the code
 var gitVersion string
+
+// pool represents pool of workers
+var pool *pond.WorkerPool
 
 // Info function returns version string of the server
 func info() string {
@@ -42,6 +47,11 @@ func main() {
 	if verbose {
 		log.SetFlags(log.LstdFlags | log.Lshortfile)
 	}
+
+	// use pool which can scale up to 50 workers has buffer capacity of 1000 tasks
+	pool = pond.New(100, 1000)
+	defer pool.StopAndWait()
+
 	if webConfig == "" {
 		time0 := time.Now()
 		wflows := strings.Split(workflow, ",")
@@ -50,7 +60,7 @@ func main() {
 		if len(wflows) == 1 {
 			out, err = check(workflow, verbose)
 		} else {
-			out, err = concurrentCheck(wflows)
+			out, err = concurrentCheck(wflows, verbose)
 		}
 		if err != nil {
 			log.Fatal(err)

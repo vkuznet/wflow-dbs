@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -17,6 +16,7 @@ type Record struct {
 	InputStats      DBSRecord
 	OutputStats     DBSRecord
 	Status          string
+	ElapsedTime     float64
 }
 
 // helper function to compare input/output dbs record stats
@@ -39,39 +39,47 @@ func compareStats(istats, ostats *DBSRecord) string {
 }
 
 // helper function to concurrently check DBS infor for given list of workflows
-func concurrentCheck(wflows []string) ([]Record, error) {
-	var lock = sync.RWMutex{}
+func concurrentCheck(wflows []string, verbose bool) ([]Record, error) {
+	time0 := time.Now()
 	ch := make(chan []Record)
 	defer close(ch)
-	umap := make(map[string]bool)
+	umap := SyncMap{}
 	for _, w := range wflows {
-		lock.Lock()
-		umap[w] = true // keep track of processed workflows below
-		lock.Unlock()
+		umap.Store(w, true)
 		go func(wflow string, c chan<- []Record) {
-			records, err := check(wflow, false)
+			records, err := check(wflow, verbose)
 			if err != nil {
-				lock.Lock()
-				umap[wflow] = false
-				lock.Unlock()
+				umap.Store(wflow, false)
 				log.Printf("fail to process %s, error %v", wflow, err)
 			}
 			c <- records
 		}(w, ch)
+		/*
+			// usage of pool provides controlled (fixed size) environment to call DBS
+			// where at most we will place number of calls limited by max pool size
+			pool.Submit(func() {
+				records, err := check(w, verbose)
+				if err != nil {
+					umap.Store(w, false)
+					log.Printf("fail to process %s, error %v", w, err)
+				}
+				ch <- records
+			})
+		*/
 	}
+
 	exit := false
 	var out []Record
 	for {
 		select {
 		case records := <-ch:
 			for _, r := range records {
+				r.ElapsedTime = time.Since(time0).Seconds()
 				out = append(out, r)
-				lock.Lock()
-				delete(umap, r.Workflow) // remove Url from map
-				lock.Unlock()
+				umap.Delete(r.Workflow)
 			}
 		default:
-			if len(umap) == 0 { // no more requests, merge data records
+			if umap.Len() == 0 {
 				exit = true
 			}
 			time.Sleep(time.Duration(10) * time.Millisecond) // wait for response
@@ -85,6 +93,7 @@ func concurrentCheck(wflows []string) ([]Record, error) {
 
 // helper function to check workflow against DBS
 func check(workflow string, verbose bool) ([]Record, error) {
+	time0 := time.Now()
 	var out []Record
 	rec, err := callReqMgr(workflow, verbose)
 	if err != nil {
@@ -117,6 +126,7 @@ func check(workflow string, verbose bool) ([]Record, error) {
 			OutputStats:     *dbsOutputRec,
 			Status:          compareStats(dbsInputRec, dbsOutputRec),
 		}
+		rec.ElapsedTime = time.Since(time0).Seconds()
 		out = append(out, rec)
 	}
 	return out, nil

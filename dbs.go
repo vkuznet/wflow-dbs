@@ -12,8 +12,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/alitto/pond"
 )
 
 const dbsUrl string = "https://cmsweb.cern.ch/dbs/prod/global/DBSReader"
@@ -109,16 +107,27 @@ func blockID(blk string) string {
 	return arr[1]
 }
 
-// GoMap represents map to keep track of go routines
-type GoMap map[string]bool
+// SyncMap represents map to keep track of go routines
+// type SyncMap map[string]bool
+type SyncMap struct {
+	sync.Map
+}
+
+// Len implements map size function
+func (m *SyncMap) Len() int {
+	count := 0
+	m.Range(func(k, v any) bool {
+		count++
+		return true
+	})
+	return count
+}
 
 // helper function to yield RunLumi records for given URL with block name
-func runLumis(rurl, bid string, verbose bool, ch chan<- RunLumi, umap *GoMap) {
-	var lock = sync.RWMutex{}
+func runLumis(rurl, bid string, verbose bool, ch chan<- RunLumi, umap *SyncMap) {
+	//     var lock = sync.Mutex{}
 	defer func() {
-		lock.Lock()
-		delete(*umap, bid) // we done with this stream of data
-		lock.Unlock()
+		umap.Delete(bid)
 		if verbose {
 			log.Println("delete", bid, "from url map")
 		}
@@ -161,35 +170,29 @@ func runLumis(rurl, bid string, verbose bool, ch chan<- RunLumi, umap *GoMap) {
 
 // helper function to get unique number of lumis for given list of blocks
 func dbsBlocksLumis(blocks []string, verbose bool) (int64, int64, error) {
-	// use pool which can scale up to 50 workers has buffer capacity of N blocks
-	pool := pond.New(50, len(blocks))
-
-	var lock = sync.RWMutex{}
 	ch := make(chan RunLumi)
 	defer close(ch)
-	umap := make(GoMap)
+	umap := SyncMap{}
 	for _, b := range blocks {
 		bid := blockID(b)
-		lock.Lock()
-		umap[bid] = true // keep track of processed block ids
-		lock.Unlock()
+		umap.Store(bid, true)
 		rurl := fmt.Sprintf("%s/filelumis?block_name=%s", dbsUrl, url.QueryEscape(b))
 
 		// usage of goroutine can lead to uncontrolled calls to DBS which will
 		// block this client at 100 req/sec
-		// go runLumis(rurl, bid, verbose, ch, &umap)
+		go runLumis(rurl, bid, verbose, ch, &umap)
 
 		// usage of pool provides controlled (fixed size) environment to call DBS
 		// where at most we will place number of calls limited by max pool size
-		pool.Submit(func() {
-			runLumis(rurl, bid, verbose, ch, &umap)
-		})
+		/*
+			pool.Submit(func() {
+				runLumis(rurl, bid, verbose, ch, &umap)
+			})
+		*/
 	}
-	// Stop the pool and wait for all submitted tasks to complete
-	defer pool.StopAndWait()
 
 	if verbose {
-		log.Printf("Make %d calls to DBS to fetch block lumis\n", len(umap))
+		log.Printf("Make %d calls to DBS to fetch block lumis\n", umap.Len())
 	}
 	exit := false
 	var out []RunLumi
@@ -198,7 +201,7 @@ func dbsBlocksLumis(blocks []string, verbose bool) (int64, int64, error) {
 		case r := <-ch:
 			out = append(out, r)
 		default:
-			if len(umap) == 0 { // no more requests, merge data records
+			if umap.Len() == 0 {
 				exit = true
 			}
 			time.Sleep(time.Duration(10) * time.Millisecond) // wait for response

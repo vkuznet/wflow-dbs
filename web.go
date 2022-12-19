@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alitto/pond"
 	"github.com/gorilla/mux"
 )
 
@@ -20,10 +21,13 @@ var _top, _bottom string
 
 // Configuration stores server configuration parameters
 type Configuration struct {
-	Port      int    `json:"port"`      // server port number
-	Base      string `json:"base"`      // server base end-point
-	StaticDir string `json:"staticdir"` // location of static directory
-	Templates string `json:"templates"`
+	Port        int    `json:"port"`        // server port number
+	Base        string `json:"base"`        // server base end-point
+	StaticDir   string `json:"staticdir"`   // location of static directory
+	Templates   string `json:"templates"`   // location of templates
+	PoolWorkers int    `json:"poolWorkers"` // number of pool workers
+	PoolTasks   int    `json:"poolTasks"`   // number of pool tasks
+	Verbose     bool   `json:"verbose"`     // verbose mode
 }
 
 // Config variable represents configuration object
@@ -42,6 +46,9 @@ func parseConfig(configFile string) error {
 	}
 	if Config.Templates == "" {
 		Config.Templates = fmt.Sprintf("%s/templates", Config.StaticDir)
+	}
+	if Config.PoolWorkers > 0 && Config.PoolTasks > 0 {
+		pool = pond.New(Config.PoolWorkers, Config.PoolTasks)
 	}
 	log.Printf("config %+v", Config)
 	return nil
@@ -128,7 +135,9 @@ func HealthzHandler(w http.ResponseWriter, r *http.Request) {
 
 // DataHandler process incoming requests
 func DataHandler(w http.ResponseWriter, r *http.Request) {
+	time0 := time.Now()
 	var out []Record
+	var workflows []string
 	var err error
 	if r.Method == "GET" {
 		var workflow string
@@ -141,7 +150,7 @@ func DataHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-		out, err = check(workflow, false)
+		out, err = check(workflow, Config.Verbose)
 		if err != nil {
 			log.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -155,7 +164,6 @@ func DataHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		var workflows []string
 		if strings.Contains(string(body), "workflows=") {
 			// web form
 			data := strings.Replace(string(body), "workflows=", "", -1)
@@ -175,12 +183,15 @@ func DataHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		out, err = concurrentCheck(workflows)
+		out, err = concurrentCheck(workflows, Config.Verbose)
 		if err != nil {
 			log.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+	}
+	if Config.Verbose {
+		log.Printf("processed %d workflows in %s", len(workflows), time.Since(time0))
 	}
 	// construct output JSON
 	data, err := json.MarshalIndent(out, "", "   ")
