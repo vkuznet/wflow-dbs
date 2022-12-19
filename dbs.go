@@ -180,15 +180,13 @@ func dbsBlocksLumis(blocks []string, verbose bool) (int64, int64, error) {
 
 		// usage of goroutine can lead to uncontrolled calls to DBS which will
 		// block this client at 100 req/sec
-		go runLumis(rurl, bid, verbose, ch, &umap)
+		//         go runLumis(rurl, bid, verbose, ch, &umap)
 
 		// usage of pool provides controlled (fixed size) environment to call DBS
 		// where at most we will place number of calls limited by max pool size
-		/*
-			pool.Submit(func() {
-				runLumis(rurl, bid, verbose, ch, &umap)
-			})
-		*/
+		pool.Submit(func() {
+			runLumis(rurl, bid, verbose, ch, &umap)
+		})
 	}
 
 	if verbose {
