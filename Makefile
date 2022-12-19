@@ -32,6 +32,9 @@ build_arm64:
 build_windows:
 	go clean; rm -rf pkg wflow-dbs; GOARCH=amd64 GOOS=windows CGO_ENABLED=0 go build -o wflow-dbs ${flags}
 
+run:
+	go run -race *.go -webConfig server.json
+
 install:
 	go install
 
