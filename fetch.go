@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/user"
+	"time"
 
 	"github.com/vkuznet/x509proxy"
 )
@@ -54,5 +55,8 @@ func HttpClient(verbose bool) *http.Client {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{Certificates: certs, InsecureSkipVerify: true},
 	}
-	return &http.Client{Transport: tr}
+	return &http.Client{
+		Transport: tr,
+		Timeout:   60 * time.Second,
+	}
 }
