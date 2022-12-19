@@ -124,11 +124,11 @@ func (m *SyncMap) Len() int {
 }
 
 // helper function to yield RunLumi records for given URL with block name
-func runLumis(rurl, bid string, verbose bool, ch chan<- RunLumi, umap *SyncMap) {
+func runLumis(rurl, bid string, verbose bool, out *[]RunLumi) {
+	time0 := time.Now()
 	defer func() {
-		umap.Delete(bid)
 		if verbose {
-			log.Println("delete", bid, "from url map")
+			log.Printf("finished %s in %s\n", bid, time.Since(time0))
 		}
 	}()
 	if verbose {
@@ -163,49 +163,29 @@ func runLumis(rurl, bid string, verbose bool, ch chan<- RunLumi, umap *SyncMap) 
 		if err == io.EOF {
 			return
 		}
-		ch <- rec
+		*out = append(*out, rec)
 	}
 }
 
 // helper function to get unique number of lumis for given list of blocks
 func dbsBlocksLumis(blocks []string, verbose bool) (int64, int64, error) {
-	ch := make(chan RunLumi)
-	defer close(ch)
-	umap := SyncMap{}
+	time0 := time.Now()
+	var out []RunLumi
+	group := pool.Group()
 	for _, b := range blocks {
 		bid := blockID(b)
-		umap.Store(bid, true)
 		rurl := fmt.Sprintf("%s/filelumis?block_name=%s", dbsUrl, url.QueryEscape(b))
-
-		// usage of goroutine can lead to uncontrolled calls to DBS which will
-		// block this client at 100 req/sec
-		//         go runLumis(rurl, bid, verbose, ch, &umap)
 
 		// usage of pool provides controlled (fixed size) environment to call DBS
 		// where at most we will place number of calls limited by max pool size
-		pool.Submit(func() {
-			runLumis(rurl, bid, verbose, ch, &umap)
+		group.Submit(func() {
+			runLumis(rurl, bid, verbose, &out)
 		})
 	}
+	group.Wait()
 
 	if verbose {
-		log.Printf("Make %d calls to DBS to fetch block lumis\n", umap.Len())
-	}
-	exit := false
-	var out []RunLumi
-	for {
-		select {
-		case r := <-ch:
-			out = append(out, r)
-		default:
-			if umap.Len() == 0 {
-				exit = true
-			}
-			time.Sleep(time.Duration(10) * time.Millisecond) // wait for response
-		}
-		if exit {
-			break
-		}
+		log.Printf("Make %d calls to DBS to fetch block lumis in %s\n", len(blocks), time.Since(time0))
 	}
 	totalLumis := int64(len(out))
 	uniqueLumis := int64(len(uniqueRunLumis(out)))
