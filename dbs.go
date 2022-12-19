@@ -125,7 +125,6 @@ func (m *SyncMap) Len() int {
 
 // helper function to yield RunLumi records for given URL with block name
 func runLumis(rurl, bid string, verbose bool, ch chan<- RunLumi, umap *SyncMap) {
-	//     var lock = sync.Mutex{}
 	defer func() {
 		umap.Delete(bid)
 		if verbose {
@@ -135,7 +134,7 @@ func runLumis(rurl, bid string, verbose bool, ch chan<- RunLumi, umap *SyncMap) 
 	if verbose {
 		log.Println("dbs call", rurl)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*180))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*60))
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", rurl, nil)
 	if err != nil {
