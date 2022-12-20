@@ -33,20 +33,28 @@ func dbsStats(dataset string, verbose bool) (*DBSRecord, error) {
 		fmt.Printf("ERROR: unable to call dbsBlocksLumis for %s, %v", dataset, err)
 		return rec, err
 	}
-	rec.TotalBlockLumis = totalLumis
-	rec.UniqueBlockLumis = uniqueLumis
+	rec.TotalFileLumis = totalLumis
+	rec.UniqueFileLumis = uniqueLumis
+
+	totalLumis, err = dbsFilesummariesLumis(blocks, verbose)
+	if err != nil {
+		fmt.Printf("ERROR: unable to call dbsFilesummariesLumis for %s, %v", dataset, err)
+		return rec, err
+	}
+	rec.FilesummariesLumis = totalLumis
 	return rec, nil
 }
 
 // DBSRecord represents filesummaries record we need to parse
 type DBSRecord struct {
-	NumLumis         int64 `json:"num_lumi"`
-	NumFiles         int64 `json:"num_file"`
-	NumEvents        int64 `json:"num_event"`
-	NumBlocks        int64 `json:"num_block"`
-	TotalBlockLumis  int64 `json:"num_block_lumis"`
-	UniqueBlockLumis int64 `json:"unique_block_lumis"`
-	NumInvalidFiles  int64 `json:"num_invalid_files"`
+	NumLumis           int64 `json:"num_lumi"`            // output of filesummaries?dataset=xxx
+	NumFiles           int64 `json:"num_file"`            // output of filesummaries?dataset=xxx
+	NumEvents          int64 `json:"num_event"`           // output of filesummaries?dataset=xxx
+	NumBlocks          int64 `json:"num_block"`           // output of filesummaries?dataset=xxx
+	TotalFileLumis     int64 `json:"num_file_lumis"`      // output of filelumis?block_name=xxx
+	UniqueFileLumis    int64 `json:"unique_file_lumis"`   // output of filelumis?block_name=xxx
+	FilesummariesLumis int64 `json:"filesummaries_lumis"` // output of filesummaries?block_name=xxx
+	NumInvalidFiles    int64 `json:"num_invalid_files"`   // number of invalid files
 }
 
 // DBSBlocks represents blocks record we need to parse
@@ -123,8 +131,17 @@ func (m *SyncMap) Len() int {
 	return count
 }
 
-// helper function to yield RunLumi records for given URL with block name
-func runLumis(rurl, bid string, verbose bool, out *[]RunLumi) {
+// Lumi represents part of filesummaries data structure
+type Lumi struct {
+	NumLumi int64 `json:"num_lumi"`
+}
+
+// DbsListEntry identifies types used by list's generics function
+type DbsListEntry interface {
+	RunLumi | Lumi
+}
+
+func dbsApiCall[T DbsListEntry](rurl, bid string, verbose bool, out *[]T) {
 	time0 := time.Now()
 	defer func() {
 		if verbose {
@@ -138,7 +155,7 @@ func runLumis(rurl, bid string, verbose bool, out *[]RunLumi) {
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", rurl, nil)
 	if err != nil {
-		log.Println("ERROR: runLumis new request", err)
+		log.Println("ERROR: dbsApiCall new request", err)
 		return
 	}
 	req.Header.Add("Accept", "application/ndjson")
@@ -147,7 +164,7 @@ func runLumis(rurl, bid string, verbose bool, out *[]RunLumi) {
 	atomic.AddUint64(&TotalURLCalls, 1)
 	if err != nil {
 		if verbose {
-			log.Println("ERROR: runLumis client.Do", err)
+			log.Println("ERROR: dbsApiCall client.Do", err)
 		}
 		return
 	}
@@ -158,7 +175,7 @@ func runLumis(rurl, bid string, verbose bool, out *[]RunLumi) {
 	// https://mottaquikarim.github.io/dev/posts/you-might-not-be-using-json.decoder-correctly-in-golang/
 	dec := json.NewDecoder(resp.Body)
 	for {
-		var rec RunLumi
+		var rec T
 		err := dec.Decode(&rec)
 		if err == io.EOF {
 			return
@@ -179,7 +196,7 @@ func dbsBlocksLumis(blocks []string, verbose bool) (int64, int64, error) {
 		// usage of pool provides controlled (fixed size) environment to call DBS
 		// where at most we will place number of calls limited by max pool size
 		group.Submit(func() {
-			runLumis(rurl, bid, verbose, &out)
+			dbsApiCall(rurl, bid, verbose, &out)
 		})
 	}
 	group.Wait()
@@ -207,6 +224,33 @@ func uniqueRunLumis(records []RunLumi) []RunLumi {
 		}
 	}
 	return out
+}
+
+// helper function to get unique number of lumis for given list of blocks
+func dbsFilesummariesLumis(blocks []string, verbose bool) (int64, error) {
+	time0 := time.Now()
+	var out []Lumi
+	group := pool.Group()
+	for _, b := range blocks {
+		bid := blockID(b)
+		rurl := fmt.Sprintf("%s/filesummaries?block_name=%s", dbsUrl, url.QueryEscape(b))
+
+		// usage of pool provides controlled (fixed size) environment to call DBS
+		// where at most we will place number of calls limited by max pool size
+		group.Submit(func() {
+			dbsApiCall(rurl, bid, verbose, &out)
+		})
+	}
+	group.Wait()
+
+	if verbose {
+		log.Printf("Make %d calls to DBS to fetch block lumis in %s\n", len(blocks), time.Since(time0))
+	}
+	var totalLumis int64
+	for _, r := range out {
+		totalLumis += r.NumLumi
+	}
+	return totalLumis, nil
 }
 
 // helper function to perform dbs call
