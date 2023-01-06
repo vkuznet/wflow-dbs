@@ -97,7 +97,9 @@ func dbsBlocks(dataset string, verbose bool) ([]string, error) {
 	}
 	for _, rec := range records {
 		if !InList(rec.BlockName, blocks) {
-			blocks = append(blocks, rec.BlockName)
+			if rec.BlockName != "" {
+				blocks = append(blocks, rec.BlockName)
+			}
 		}
 	}
 	return blocks, nil
@@ -113,7 +115,7 @@ type RunLumi struct {
 func blockID(blk string) string {
 	arr := strings.Split(blk, "#")
 	if len(arr) != 2 {
-		log.Println("### unable to extract block ID from", blk)
+		log.Printf("### unable to extract block ID from '%s'", blk)
 		return blk
 	}
 	return arr[1]
@@ -239,6 +241,9 @@ func dbsFilesummariesLumis(blocks []string, verbose bool) (int64, error) {
 	var out []Lumi
 	group := pool.Group()
 	for _, b := range blocks {
+		if b == "" {
+			continue
+		}
 		bid := blockID(b)
 		rurl := fmt.Sprintf("%s/filesummaries?block_name=%s", dbsUrl, url.QueryEscape(b))
 
