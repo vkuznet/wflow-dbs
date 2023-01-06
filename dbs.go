@@ -112,6 +112,10 @@ type RunLumi struct {
 // helper function to extract block ID from block name
 func blockID(blk string) string {
 	arr := strings.Split(blk, "#")
+	if len(arr) != 2 {
+		log.Println("### unable to extract block ID from", blk)
+		return blk
+	}
 	return arr[1]
 }
 
@@ -190,7 +194,6 @@ func dbsBlocksLumis(blocks []string, verbose bool) (int64, int64, error) {
 	var out []RunLumi
 	group := pool.Group()
 	for _, b := range blocks {
-		log.Println("### block", b)
 		bid := blockID(b)
 		rurl := fmt.Sprintf("%s/filelumis?block_name=%s", dbsUrl, url.QueryEscape(b))
 
