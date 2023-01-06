@@ -190,6 +190,7 @@ func dbsBlocksLumis(blocks []string, verbose bool) (int64, int64, error) {
 	var out []RunLumi
 	group := pool.Group()
 	for _, b := range blocks {
+		log.Println("### block", b)
 		bid := blockID(b)
 		rurl := fmt.Sprintf("%s/filelumis?block_name=%s", dbsUrl, url.QueryEscape(b))
 
