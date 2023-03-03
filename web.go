@@ -79,9 +79,10 @@ func Handlers() *mux.Router {
 	router.HandleFunc(basePath("/healthz"), HealthzHandler).Methods("GET")
 
 	// static handlers
-	for _, dir := range []string{"js", "css", "images"} {
+	for _, dir := range []string{"js", "css", "images", "templates"} {
 		m := fmt.Sprintf("%s/%s/", Config.Base, dir)
 		d := fmt.Sprintf("%s/%s", Config.StaticDir, dir)
+		log.Println("static content", m, d)
 		http.Handle(m, http.StripPrefix(m, http.FileServer(http.Dir(d))))
 	}
 
