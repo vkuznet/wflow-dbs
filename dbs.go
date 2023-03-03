@@ -18,9 +18,9 @@ const dbsUrl string = "https://cmsweb.cern.ch/dbs/prod/global/DBSReader"
 
 // helper function to get DBS stats for total/valid number of files
 func dbsStats(dataset string, verbose bool) (*DBSRecord, error) {
-	rec, err := dbsCall(dataset, 1, verbose)
+	rec, err := dbsDatasetStats(dataset, 1, verbose)
 	if err != nil {
-		fmt.Printf("ERROR: unable to call dbsCall for %s, %v", dataset, err)
+		fmt.Printf("ERROR: unable to call dbsDatasetStats for %s, %v", dataset, err)
 		return rec, err
 	}
 	blocks, err := dbsBlocks(dataset, verbose)
@@ -266,14 +266,40 @@ func dbsFilesummariesLumis(blocks []string, verbose bool) (int64, error) {
 }
 
 // helper function to perform dbs call
-func dbsCall(input string, validFileOnly int, verbose bool) (*DBSRecord, error) {
+func dbsDatasetStats(input string, validFileOnly int, verbose bool) (*DBSRecord, error) {
 	rurl := fmt.Sprintf("%s/filesummaries?dataset=%s", dbsUrl, input)
 	if validFileOnly == 1 {
 		rurl = fmt.Sprintf("%s/filesummaries?dataset=%s&validFileOnly=%d", dbsUrl, input, validFileOnly)
 	}
-	if verbose {
-		log.Println("dbs call", rurl)
+	records, err := dbsCall(rurl, verbose)
+	if err != nil {
+		return nil, err
 	}
+	rec := records[0]
+	// find out number of valid files in given dataset
+	validFiles, err := dbsValidFiles(input, verbose)
+	if err == nil {
+		// the number of files includes all files (valid and invalid)
+		rec.NumInvalidFiles = rec.NumFiles - int64(len(validFiles))
+	}
+	return &rec, err
+}
+
+// helper function to find out number of invalid files
+func dbsInvalidFiles(input string, verbose bool) ([]DBSRecord, error) {
+	rurl := fmt.Sprintf("%s/files?dataset=%s&validFileOnly=0", dbsUrl, input)
+	return dbsCall(rurl, verbose)
+}
+
+// helper function to find out number of valid files
+func dbsValidFiles(input string, verbose bool) ([]DBSRecord, error) {
+	rurl := fmt.Sprintf("%s/files?dataset=%s&validFileOnly=1", dbsUrl, input)
+	return dbsCall(rurl, verbose)
+}
+
+
+// helper function to perform dbs call
+func dbsCall(rurl string, verbose bool) ([]DBSRecord, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*60))
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", rurl, nil)
@@ -306,8 +332,6 @@ func dbsCall(input string, validFileOnly int, verbose bool) (*DBSRecord, error) 
 		}
 		return nil, err
 	}
-	rec := records[0]
-	rec.NumInvalidFiles = rec.NumFiles - int64(len(records))
-	return &rec, nil
+	return records, err
 
 }
